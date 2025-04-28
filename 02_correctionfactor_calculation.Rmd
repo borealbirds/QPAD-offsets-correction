@@ -1,5 +1,7 @@
 ---
-title: Adjusting offsets
+title: QPAD offset correction factor calculation
+author: Peter Solymos
+date: April 4, 2025
 output: pdf_document
 ---
 
