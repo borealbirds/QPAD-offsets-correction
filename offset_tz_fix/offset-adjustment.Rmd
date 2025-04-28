@@ -1,0 +1,76 @@
+---
+title: Adjusting offsets
+output: pdf_document
+---
+
+In QPAD, we have the expected value of the counts ($Y$) defined as $E[Y]=DApq$.
+We use the following settings for density ($D$) and the detectability correction ($Apq$).
+The _old_ (biased due to TZ offset issue) and _new_ (fixed) corrections
+are used here as follows:
+
+```{r}
+D <- 1
+Apq_old <- 0.94
+Apq_new <- 1.12
+```
+
+These numbers were taken from the actual offsets (mean of the means) from the BAM data.
+
+Let's assume that the _new_ correction is right, so we simulate under:
+
+```{r}
+n <- 1000
+Y <- rpois(n, lambda = D * Apq_new)
+```
+
+Now we estimate density as if our detectability offset estimate would be correct.
+We can see that the estimate of $D$ is correct, as expected:
+
+```{r}
+off_new <- log(rep(Apq_new, n))
+m1 <- glm(Y ~ 1 + offset(off_new), family=poisson)
+(D_new <- exp(coef(m1)))
+```
+
+Now what happens if we use the biased offset estimate? $D$ is overestimated:
+
+```{r}
+off_old <- log(rep(Apq_old, n))
+m2 <- glm(Y ~ 1 + offset(off_old), family=poisson)
+(D_old <- exp(coef(m2)))
+```
+
+The question now: how can we correct the _old_ density estimate using the
+_old_ and _new_ offsets without having to re-estimate density using the _new_ offsets.
+
+$Y=D_{old}C_{old}$ and $Y=D_{new}C_{new}$, therefore
+$D_{new} = D_{old}C_{old}/C_{new}$.
+On the log scale: $log(D_{new}) = log(D_{old})+log(C_{old})-log(C_{new})$.
+
+```{r}
+adj <-  log(Apq_old) - log(Apq_new)
+exp(log(D_old) + adj)
+```
+
+Which is the same as:
+
+```{r}
+alpha <- exp(adj)
+D_old * alpha
+```
+
+Applying the adjustment to tabular population summaries:
+
+- calculate the exponentiated adjustment value as $\alpha=C_{old}/C_{new}$
+- apply the $\alpha$ value on density (not estimated population size $N$) so that $D_{adj} = D_{unadjusted} \alpha$
+- calculate $N_{adj}$ as $D_{adj}A$
+- do this for for every spatial unit using the adjustment that applies in that particular region (the BCR subunit that the region is nested inside)
+- same applies to land cover classes within that BCR subunit
+- note that this needs to be repeated for all impacted species independently
+
+For maps:
+
+- use $D_{adj} = D_{unadjusted} \alpha$ at the pixel level
+- for this we can make a raster with adjustment values added for the cells matching the cell's BCR subunit designation
+- take the adjustment layer and multiply with the density layer
+- note that this needs to be repeated for all impacted species independently
