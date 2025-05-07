@@ -8,7 +8,7 @@ output: pdf_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 
-#load libraries
+# load libraries
 library(raster)
 library(sp)
 library(suntools)
@@ -16,25 +16,25 @@ library(lutz)
 library(suncalc)
 library(tidyverse)
 
-#load time offset zone raster
+# load time offset zone raster
 rtz <- raster("utcoffset.tif")
 
-#get example data
+# get example data
 dat <- read.csv("TSSRExample.csv")
 
-#format to dtm
+# format to dtm
 date <- dat$datetime
 dtm <- strptime(date, format="%Y-%m-%d %H:%M:%S", tz="America/Edmonton")
 
-#get day and hour
+# get day and hour
 day <- as.integer(dtm$yday)
 hour <- as.numeric(round(dtm$hour + dtm$min/60, 2))
 
-#get coords
+# get coords
 lon <- dat$lon
 lat <- dat$lat
 
-#project for extraction
+# project for extraction
 xy <- data.frame(x=lon, y=lat)
 xy$x[is.na(xy$x)] <- mean(xy$x, na.rm=TRUE)
 xy$y[is.na(xy$y)] <- mean(xy$y, na.rm=TRUE)
@@ -130,34 +130,37 @@ ggplot(tssr.df) +
 
 We can double check that subtraction of the time zone offset gives us the correct TSSR by comparing to a slower alternate approach. Here, we use the `lutz` package to look up timezone using the coordinates and use that timezone in the sunrise calculation directly.
 ```{r}
-#look up timezones
+# look up timezones
 dat$tz <- tz_lookup_coords(lat, lon, method="accurate")
 
-#calculate sunrise for each timezone
+# calculate sunrise for each timezone
 tzs <- unique(dat$tz)
 out <- data.frame()
 for(i in 1:length(tzs)){
 
-    #get just the data for that timezone
+    # get just the data for that timezone
     dat.i <- dplyr::filter(dat, tz==tzs[i]) |>
         mutate(datetime = ymd_hms(datetime, tz=tzs[i]),
                date = as.Date(datetime, tz=tzs[i]))
 
-    #get sunrise time
+    # get sunrise time
     dat.i$sr2 <- getSunlightTimes(data=dat.i, keep="sunrise", tz=tzs[i])$sunrise
     
-    #fix America/Regina
+    # fix America/Regina
     if(tzs[i]=="America/Regina"){dat.i$sr2 <- dat.i$sr2 + 3600}
 
-    #output
+    # output
     out <- rbind(out, dat.i)
 }
 
-#calculate tssr
+# calculate tssr
 out$TSSR_alternate <- as.numeric(difftime(out$datetime, out$sr), units="hours")
 ```
-Let's compare `TSSR_bug` and `TSSR_fix` to the alernate approach to double check.
-```{r, echo=FALSE}
+Let's compare `TSSR_bug` and `TSSR_fix` to the alternate approach to double check.
+
+Looks good, onward!
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
 check <- dat |> 
   mutate(TSSR_bug = TSSR_bug,
          TSSR_fix = TSSR_fix,
@@ -167,7 +170,7 @@ check <- dat |>
   pivot_longer(TSSR_bug:TSSR_fix, names_to="approach", values_to="TSSR") |> 
   mutate(diff = TSSR_alternate - TSSR)
 
-ggplot(check |> dplyr::filter(!is.na(TSSR))) +
+ggplot(check) +
   geom_point(aes(x=TSSR_alternate, y=TSSR, colour=ltz)) +
   facet_wrap(~approach) +
   scale_colour_viridis_c(name="Time zone\noffset") +
@@ -176,4 +179,3 @@ ggplot(check |> dplyr::filter(!is.na(TSSR))) +
   ylab("Hours since sunrise from QPAD approach") +
   theme(legend.position="bottom")
 ```
-Looks good, onward!
