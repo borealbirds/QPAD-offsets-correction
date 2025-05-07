@@ -1,30 +1,179 @@
 ---
 title: QPAD bug explanation
 author: Elly Knight
-date: April 28, 2025
+date: May 7, 2025
 output: pdf_document
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+
+#load libraries
+library(raster)
+library(sp)
+library(suntools)
+library(lutz)
+library(suncalc)
+library(tidyverse)
+
+#load time offset zone raster
+rtz <- raster("utcoffset.tif")
+
+#get example data
+dat <- read.csv("TSSRExample.csv")
+
+#format to dtm
+date <- dat$datetime
+dtm <- strptime(date, format="%Y-%m-%d %H:%M:%S", tz="America/Edmonton")
+
+#get day and hour
+day <- as.integer(dtm$yday)
+hour <- as.numeric(round(dtm$hour + dtm$min/60, 2))
+
+#get coords
+lon <- dat$lon
+lat <- dat$lat
+
+#project for extraction
+xy <- data.frame(x=lon, y=lat)
+xy$x[is.na(xy$x)] <- mean(xy$x, na.rm=TRUE)
+xy$y[is.na(xy$y)] <- mean(xy$y, na.rm=TRUE)
+coordinates(xy) <- ~ x + y
+proj4string(xy) <- "+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0"
+xy <- invisible(spTransform(xy, crs(rtz)))
 ```
 
-## R Markdown
+## Background
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+In QPAD, the set of removal models for availability for detection includes a term for time of day, measures as time since sunrise (TSSR). For each species, a set of models are fit and the best-fitting model is selected as the model with the lowest BIC.
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+The coefficients from that best-fitting model are then used to calculate the mean cue rate for a species as part of the QPAD offset calculation. The functions within the `qpad-offsets` repository and the `wildrtrax` R package that prepare the covariates for cue rate calculation calculate TSSR for the mountain time zone and then use the coordinates of the survey to extract a time zone value for that location from a raster and use that time zone value to adjust the TSSR. We use this raster-based correction approach because it is much more efficient for large datasets than other available time zone lookup functions (see 'Comparison to alternate approach' below)
 
-```{r cars}
-summary(cars)
+```{r, echo=FALSE}
+
+rtz.df <- rtz |> 
+  raster::aggregate(10) |> 
+  raster::projectRaster(crs=4326) |> 
+  as.data.frame(xy=TRUE) |> 
+  mutate(utcoffset = round(utcoffset)) |> 
+  dplyr::filter(!utcoffset %in% c("NaN", -3),
+                !is.na(utcoffset))
+
+ggplot() +
+  geom_raster(data=rtz.df, aes(x=x, y=y, fill=utcoffset)) +
+  geom_point(data=dat, aes(x=lon, y=lat)) +
+  ggtitle("Time zone raster with example survey locations") +
+  scale_fill_viridis_c(name="Time zone\noffset") +
+  theme_classic() +
+  xlab("Longitude") +
+  ylab("Latitude") 
+
 ```
 
-## Including Plots
+## Code bug
 
-You can also embed plots, for example:
+In the original code, the adjustment was made by subtracting sunrise from the survey time and adding the time zone offset.
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+```{r}
+
+# get time zone offset
+ltz <- raster::extract(rtz, xy) + 7
+
+# get sunrise in mountain time
+sr <- sunriset(cbind("X"=lon, "Y"=lat),
+               as.POSIXct(dtm, tz="America/Edmonton"),
+               direction="sunrise", POSIXct.out=FALSE) * 24
+
+# calculate TSSR
+TSSR_bug <- hour - sr$day_frac + ltz
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+However, the addition of the time zone offset doubles the time zone difference relative to mountain time zone instead of zeroing it. We can detect this bug in the TSSR as a linear relationship between TSSR and longitude.
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+tssr.df <- data.frame(ltz=ltz,
+                      hour=hour,
+                      sr=sr$day_frac,
+                      lon=lon,
+                      TSSR1=TSSR_bug)
+
+ggplot(tssr.df) +
+  geom_point(aes(x=lon, y=TSSR1)) +
+  theme_classic() +
+  xlab("Longitude") +
+  ylab("Hours since sunrise")
+
+```
+
+## Bug Correction
+
+If we instead subtract the time zone offset, we see the relationship is nullified.
+```{r}
+# calculate TSSR
+TSSR_fix <- hour - sr$day_frac - ltz
+```
+```{r, echo=FALSE, warning=FALSE}
+tssr.df <- data.frame(ltz=ltz,
+                      hour=hour,
+                      sr=sr$day_frac,
+                      lon=lon,
+                      TSSR=TSSR_fix)
+
+ggplot(tssr.df) +
+  geom_point(aes(x=lon, y=TSSR)) +
+  theme_classic() +
+  xlab("Longitude") +
+  ylab("Hours since sunrise")
+
+```
+
+## Comparison to alternate approach
+
+We can double check that subtraction of the time zone offset gives us the correct TSSR by comparing to a slower alternate approach. Here, we use the `lutz` package to look up timezone using the coordinates and use that timezone in the sunrise calculation directly.
+```{r}
+#look up timezones
+dat$tz <- tz_lookup_coords(lat, lon, method="accurate")
+
+#calculate sunrise for each timezone
+tzs <- unique(dat$tz)
+out <- data.frame()
+for(i in 1:length(tzs)){
+
+    #get just the data for that timezone
+    dat.i <- dplyr::filter(dat, tz==tzs[i]) |>
+        mutate(datetime = ymd_hms(datetime, tz=tzs[i]),
+               date = as.Date(datetime, tz=tzs[i]))
+
+    #get sunrise time
+    dat.i$sr2 <- getSunlightTimes(data=dat.i, keep="sunrise", tz=tzs[i])$sunrise
+    
+    #fix America/Regina
+    if(tzs[i]=="America/Regina"){dat.i$sr2 <- dat.i$sr2 + 3600}
+
+    #output
+    out <- rbind(out, dat.i)
+}
+
+#calculate tssr
+out$TSSR_alternate <- as.numeric(difftime(out$datetime, out$sr), units="hours")
+```
+Let's compare `TSSR_bug` and `TSSR_fix` to the alernate approach to double check.
+```{r, echo=FALSE}
+check <- dat |> 
+  mutate(TSSR_bug = TSSR_bug,
+         TSSR_fix = TSSR_fix,
+         ltz = ltz - 7) |> 
+  left_join(out |> 
+              dplyr::select(-datetime)) |> 
+  pivot_longer(TSSR_bug:TSSR_fix, names_to="approach", values_to="TSSR") |> 
+  mutate(diff = TSSR_alternate - TSSR)
+
+ggplot(check |> dplyr::filter(!is.na(TSSR))) +
+  geom_point(aes(x=TSSR_alternate, y=TSSR, colour=ltz)) +
+  facet_wrap(~approach) +
+  scale_colour_viridis_c(name="Time zone\noffset") +
+  theme_classic() +
+  xlab("Hours since sunrise from alternate approach") +
+  ylab("Hours since sunrise from QPAD approach") +
+  theme(legend.position="bottom")
+```
+Looks good, onward!
