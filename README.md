@@ -3,11 +3,11 @@
 ## Background
 In late March 2025, we discovered and fixed a bug in the code for calculating QPAD offsets that dated back approximately ten years.
 
-The bug was within the code used to adjust time zones and therefore affects QPAD offsets used for:
+The bug was within the code used to adjust time zones and therefore affects QPAD offsets used for
 1) [species with time since sunrise in the top model](https://github.com/borealbirds/QPAD-offsets-correction/blob/main/qpad_tssr_species.csv) and,
 2) in areas outside the mountain time zone.
 
-Since QPAD offsets only adjust the intercept of model estimates, this bug will only affect model outcomes if:
+Since QPAD offsets only adjust the intercept of model estimates, this bug will only affect model outcomes if
 1) models were built for density or population estimates per se, or
 2) models were compared or integrated across time zones.
 Relative patterns of density (e.g., habitat coefficients) within time zones should be unaffected.
