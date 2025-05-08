@@ -4,7 +4,7 @@
 In late March 2025, we discovered and fixed a bug in the code for calculating QPAD offsets that dated back approximately ten years.
 
 The bug was within the code used to adjust time zones and therefore affects QPAD offsets used for
-1) [species with time since sunrise in the top model](https://github.com/borealbirds/QPAD-offsets-correction/blob/main/qpad_tssr_species.csv) and,
+1) [species with time since sunrise in the top model](https://github.com/borealbirds/QPAD-offsets-correction/blob/main/qpad_tssr_species.csv), and,
 2) in areas outside the mountain time zone.
 
 Since QPAD offsets only adjust the intercept of model estimates, this bug will only affect model outcomes if
