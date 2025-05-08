@@ -12,12 +12,12 @@ Since QPAD offsets only adjust the intercept of model estimates, this bug will o
 2) models were compared or integrated across time zones.
 Relative patterns of density (e.g., habitat coefficients) within time zones should be unaffected.
 
-The bug per se has been fixed in all available code, specifically the (`qpad-offsets repository`)[https://github.com/borealbirds/qpad-offsets] and the (`wildrtrax`)[https://github.com/ABbiodiversity/wildRtrax] R package. For previous analyses such as [V4 of the BAM landbird models](https://borealbirds.github.io/), we have developed correction factors for post-hoc correction. 
+The bug per se has been fixed in all available code, specifically the [`qpad-offsets repository`](https://github.com/borealbirds/qpad-offsets) and the [`wildrtrax`](https://github.com/ABbiodiversity/wildRtrax) R package. For previous analyses such as [V4 of the BAM landbird models](https://borealbirds.github.io/), we have developed correction factors for post-hoc correction. 
 
 ## Repository components
 This repository is intended to document the bug and support users for post-hoc correction. It contains the [correction factors](https://github.com/borealbirds/QPAD-offsets-correction/blob/main/offset-correctionfactors-2025-04-04.csv) and three markdown documents:
-1) (An explanation of the bug and how it was fixed)[https://github.com/borealbirds/QPAD-offsets-correction/blob/main/01_qpadbug_explanation.pdf]
-2) (An explanation of how the correction factors were derived)[https://github.com/borealbirds/QPAD-offsets-correction/blob/main/02_correctionfactor_calculation.pdf]
+1) [An explanation of the bug and how it was fixed](https://github.com/borealbirds/QPAD-offsets-correction/blob/main/01_qpadbug_explanation.pdf)
+2) [An explanation of how the correction factors were derived](https://github.com/borealbirds/QPAD-offsets-correction/blob/main/02_correctionfactor_calculation.pdf)
 3) An example of how the correction factors can be applied
 
 ## Support
