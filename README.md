@@ -20,4 +20,5 @@ This repository is intended to document the bug and support users for post-hoc c
 2) (An explanation of how the correction factors were derived)[https://github.com/borealbirds/QPAD-offsets-correction/blob/main/02_correctionfactor_calculation.pdf]
 3) An example of how the correction factors can be applied
 
+## Support
 Please reach out at bamp@ualberta.ca with questions or for support.
