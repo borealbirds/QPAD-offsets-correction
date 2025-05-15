@@ -1,19 +1,19 @@
 ---
-title: QPAD offset correction factor implementation
-author: Anna Drake
-date: May 15, 2025
-output: pdf_document
+title: "QPAD offset correction factor implementation"
+author: "Anna Drake"
+date: "May 15, 2025"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
 ---
-
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
-# Example 
-
-American Redstart QPAD availability models include TSSR (time-since-sunrise) as a linear and squared term. The offset assumes late survey times have low availability. With the QPAD bug, density was inflated in BCR 14 (where TSSR is incorrectly late)
+# Example: 
+American Redstart (AMRE) QPAD availability models include TSSR (time-since-sunrise) as a linear and squared term. The offset assumes late survey times have low availability. With the QPAD bug, density was inflated in BCR 14 (where TSSR is incorrectly late)
 
 In this toy example, we use a 5 x 5 km area of V4 predictions for AMRE in Nova Scotia and correct mean regional density and population, and mean density and population by habitat category
-
 ```{r load packages, include=FALSE}
 require(terra)
 require(data.table)
@@ -31,52 +31,57 @@ old_Dens<-c(0.4679583,0.4588071,0.4595374,0.4584988,0.4319231,
 Habitat <-c(rep(5,3),rep(10,5),rep(3,4), rep(5,8), rep(10,5))
 ```
 ## Generate toy density raster 
-```{r}
+```{r echo=TRUE}
 m <- matrix(old_Dens, nrow=5, ncol=5)
 Dens <- rast(m)
 names(Dens)<-"Density"
 plot(Dens)
-# This output is density (males/ha) 
 ```
+This output is density (males/ha) 
+
 ## Generate toy habitat raster 
-```{r}
+```{r echo=TRUE}
 m <- matrix(Habitat, nrow=5, ncol=5)
 Hab <- rast(m)
 names(Hab)<-"Habitat"
 plot(Hab)
 ```
+
 # The old estimates are:
 Mean density:
 ```{r}
 Dens%>%global(.,fun="mean")
 # ~0.43 males/ha
 ```
-Population (sum density accounding for 100 ha per km2):
+Population (sum density accounting for 100 ha per km2):
 ```{r}
 Dens%>%global(., fun="sum")*100
 # ~1082 individuals (males)
 ```
 Density by habitat:
-```{r}
+```{r echo=TRUE}
 OldHab<-c(Dens,Hab)%>% data.frame() %>% group_by(Habitat)%>%summarize(mean(Density))
 print(OldHab)
 ```
 Population by habitat:
-```{r}
+```{r echo=TRUE}
 OldPopHab<-c(Dens,Hab)%>% data.frame() %>% group_by(Habitat)%>%summarize(sum(Density)*100)
 print(OldPopHab)
 ```
 # Correcting for QPAD bug
-When density is predicted across the landscape, the QPAD offset applied to obtain density is the mean of the individual offsets that were included in the model. Thus it is constant over the entire prediction area and is adjusted using a correction value applied over the entire prediciton area.
+When density is predicted across the landscape, the QPAD offset applied to the prediction is the mean of the individual offsets that were included in the model. Thus: (1) the offset applied is constant over the entire prediction area and can therefore be adjusted using a correction value applied over the entire prediction area; (2) correction values are model-specific and need to be calculated from the offsets that entered the original model (*see* "QPAD offset correction factor calculation")
 
-First, obtain alpha (correction) in the V4 look-up table for specific BCR X species (BCR 14, AMRE in this case)
-```{r}
+Here we correct the V4 model outputs using V4-specific correction values...
+
+First, obtain alpha (the correction value) in the V4 look-up table for the appropriate BCR X species (BCR 14, AMRE in this case)
+```{r echo=TRUE}
 alpha<-0.830324685
 # correct the raster ----
 NewDens<-Dens*alpha
 plot(NewDens)
 ```
 ## The corrected estimates are:
+
 Mean density:
 ```{r}
 NewDens%>%global(.,fun="mean")
@@ -112,4 +117,5 @@ print(NewPopHab)
 OldPopHab$`sum(Density) * 100`*alpha
 ```
 # Correcting over multiple model areas
+
 Where total population or mean density estimates were produced for areas that span multiple BCRs (i.e. multiple model prediction outputs), the predictions for each BCR need to be corrected independantly and then the pooled results re-calculated. This is because each BCR will have it's own correction factor and BCR sizes are not equivalent. For example, if correcting a Canada-wide population estimate, BCR-level population estimates need to be recalculated from corrected density layers and then summed to the corrected Canada-wide population value.
