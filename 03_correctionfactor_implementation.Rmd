@@ -18,11 +18,9 @@ In this toy example, we use a 5 x 5 km area of V4 predictions for AMRE in Nova S
 require(terra)
 require(data.table)
 require(dplyr)
-
 ```
-
 # Original model output (with QPAD bug) 
-```{r, echo=TRUE}
+```{r}
 old_Dens<-c(0.4679583,0.4588071,0.4595374,0.4584988,0.4319231,
             0.4605061,0.4569824,0.4618142,0.4599639,0.4238518,
             0.4212123,0.4199490,0.4511571,0.4261385,0.4161192,
@@ -33,7 +31,7 @@ old_Dens<-c(0.4679583,0.4588071,0.4595374,0.4584988,0.4319231,
 Habitat <-c(rep(5,3),rep(10,5),rep(3,4), rep(5,8), rep(10,5))
 ```
 ## Generate toy density raster 
-```{r, echo=TRUE}
+```{r}
 m <- matrix(old_Dens, nrow=5, ncol=5)
 Dens <- rast(m)
 names(Dens)<-"Density"
@@ -41,51 +39,46 @@ plot(Dens)
 # This output is density (males/ha) 
 ```
 ## Generate toy habitat raster 
-```{r, echo=TRUE}
+```{r}
 m <- matrix(Habitat, nrow=5, ncol=5)
 Hab <- rast(m)
 names(Hab)<-"Habitat"
 plot(Hab)
 ```
-
 # The old estimates are:
 Mean density:
-```{r, echo=TRUE}
+```{r}
 Dens%>%global(.,fun="mean")
 # ~0.43 males/ha
 ```
 Population (sum density accounding for 100 ha per km2):
-```{r, echo=TRUE}
+```{r}
 Dens%>%global(., fun="sum")*100
 # ~1082 individuals (males)
 ```
 Density by habitat:
-```{r, echo=TRUE}
+```{r}
 OldHab<-c(Dens,Hab)%>% data.frame() %>% group_by(Habitat)%>%summarize(mean(Density))
 print(OldHab)
 ```
 Population by habitat:
-```{r, echo=TRUE}
+```{r}
 OldPopHab<-c(Dens,Hab)%>% data.frame() %>% group_by(Habitat)%>%summarize(sum(Density)*100)
 print(OldPopHab)
 ```
-
 # Correcting for QPAD bug
-
 When density is predicted across the landscape, the QPAD offset applied to obtain density is the mean of the individual offsets that were included in the model. Thus it is constant over the entire prediction area and is adjusted using a correction value applied over the entire prediciton area.
 
-First, obtain alpha (correction) in the V4 look-up table for specific BCR X species* (BCR 14, AMRE in this case)
-```{r, echo=TRUE}
+First, obtain alpha (correction) in the V4 look-up table for specific BCR X species (BCR 14, AMRE in this case)
+```{r}
 alpha<-0.830324685
-
 # correct the raster ----
 NewDens<-Dens*alpha
 plot(NewDens)
 ```
-
 ## The corrected estimates are:
 Mean density:
-```{r, echo=TRUE}
+```{r}
 NewDens%>%global(.,fun="mean")
 # ~0.36 males/ha
 
@@ -94,7 +87,7 @@ NewDens%>%global(.,fun="mean")
 # ~0.36 males/ha
 ```
 Population (sum density accounting for 100 ha per km2):
-```{r, echo=TRUE}
+```{r}
 NewDens%>%global(., fun="sum")*100
 # ~899 individuals (males)
 
@@ -103,7 +96,7 @@ NewDens%>%global(., fun="sum")*100
 # ~899 individuals (males)
 ```
 Density by habitat:
-```{r, echo=TRUE}
+```{r}
 NewHab<-c(NewDens,Hab)%>% data.frame() %>% group_by(Habitat)%>%summarize(mean(Density))
 print(NewHab)
 
@@ -111,14 +104,12 @@ print(NewHab)
 OldHab$`mean(Density)`*alpha
 ```
 Population by habitat:
-```{r, echo=TRUE}
+```{r}
 NewPopHab<-c(NewDens,Hab)%>% data.frame() %>% group_by(Habitat)%>%summarize(sum(Density)*100)
 print(NewPopHab)
 
 #And as above...
 OldPopHab$`sum(Density) * 100`*alpha
 ```
-
 # Correcting over multiple model areas
-
 Where total population or mean density estimates were produced for areas that span multiple BCRs (i.e. multiple model prediction outputs), the predictions for each BCR need to be corrected independantly and then the pooled results re-calculated. This is because each BCR will have it's own correction factor and BCR sizes are not equivalent. For example, if correcting a Canada-wide population estimate, BCR-level population estimates need to be recalculated from corrected density layers and then summed to the corrected Canada-wide population value.
