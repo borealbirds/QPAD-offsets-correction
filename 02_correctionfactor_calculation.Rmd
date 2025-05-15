@@ -64,15 +64,15 @@ D_old * alpha
 Applying the adjustment to tabular population summaries:
 
 - calculate the exponentiated adjustment value as $\alpha=C_{old}/C_{new}$
-- apply the $\alpha$ value on density (not estimated population size $N$) so that $D_{adj} = D_{unadjusted} \alpha$
+- apply the $\alpha$ value on density so that $D_{adj} = D_{unadjusted} \alpha$
 - calculate $N_{adj}$ as $D_{adj}A$
 - do this for for every spatial unit using the adjustment that applies in that particular region (the BCR subunit that the region is nested inside)
 - same applies to land cover classes within that BCR subunit
-- note that this needs to be repeated for all impacted species independently
+- note that this needs to be repeated for all impacted species independently because the corrections vary by species
 
 For maps:
 
 - use $D_{adj} = D_{unadjusted} \alpha$ at the pixel level
 - for this we can make a raster with adjustment values added for the cells matching the cell's BCR subunit designation
 - take the adjustment layer and multiply with the density layer
-- note that this needs to be repeated for all impacted species independently
+- note that this needs to be repeated for all impacted species independently because the corrections vary by species
